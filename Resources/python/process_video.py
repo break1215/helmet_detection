@@ -4,44 +4,44 @@ import os
 from pathlib import Path
 from ultralytics import YOLO
 
-print("[DEBUG] 脚本开始")
-print(f"[DEBUG] 命令行参数: {sys.argv}")
+print("[DEBUG] 脚本开始", flush=True)
+print(f"[DEBUG] 命令行参数: {sys.argv}", flush=True)
 
 if len(sys.argv) < 4:
-    print("[ERROR] 使用方法: python process_video.py <video_path> <model_path> <output_dir>")
+    print("[ERROR] 使用方法: python process_video.py <video_path> <model_path> <output_dir>", flush=True)
     sys.exit(1)
 
 video_path = sys.argv[1]
 model_path = sys.argv[2]
 output_dir = sys.argv[3]
 
-print(f"[DEBUG] 视频路径: {video_path}")
-print(f"[DEBUG] 模型路径: {model_path}")
-print(f"[DEBUG] 输出目录: {output_dir}")
+print(f"[DEBUG] 视频路径: {video_path}", flush=True)
+print(f"[DEBUG] 模型路径: {model_path}", flush=True)
+print(f"[DEBUG] 输出目录: {output_dir}", flush=True)
 
 # 检查文件是否存在
 if not os.path.exists(video_path):
-    print(f"[ERROR] 视频文件不存在: {video_path}")
+    print(f"[ERROR] 视频文件不存在: {video_path}", flush=True)
     sys.exit(1)
 
 if not os.path.exists(model_path):
-    print(f"[ERROR] 模型文件不存在: {model_path}")
+    print(f"[ERROR] 模型文件不存在: {model_path}", flush=True)
     sys.exit(1)
 
 # 创建输出目录
 try:
     os.makedirs(output_dir, exist_ok=True)
-    print(f"[DEBUG] 输出目录已创建: {output_dir}")
+    print(f"[DEBUG] 输出目录已创建: {output_dir}", flush=True)
 except Exception as e:
-    print(f"[ERROR] 创建输出目录失败: {e}")
+    print(f"[ERROR] 创建输出目录失败: {e}", flush=True)
     sys.exit(1)
 
 # 打开视频
-print("[DEBUG] 正在打开视频...")
+print("[DEBUG] 正在打开视频...", flush=True)
 try:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("[ERROR] 无法打开视频文件")
+        print("[ERROR] 无法打开视频文件", flush=True)
         sys.exit(1)
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -49,36 +49,40 @@ try:
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    print(f"[DEBUG] 视频信息:")
-    print(f"       总帧数: {total_frames}")
-    print(f"       FPS: {fps}")
-    print(f"       分辨率: {width}x{height}")
+    print(f"[DEBUG] 视频信息:", flush=True)
+    print(f"       总帧数: {total_frames}", flush=True)
+    print(f"       FPS: {fps}", flush=True)
+    print(f"       分辨率: {width}x{height}", flush=True)
 except Exception as e:
-    print(f"[ERROR] 读取视频信息失败: {e}")
+    print(f"[ERROR] 读取视频信息失败: {e}", flush=True)
     sys.exit(1)
 
 # 加载模型
-print("[DEBUG] 正在加载YOLOv8模型...")
+print("[DEBUG] 正在加载YOLOv8模型...", flush=True)
 try:
     model = YOLO(model_path)
-    print("[DEBUG] 模型加载成功")
+    print("[DEBUG] 模型加载成功", flush=True)
 except Exception as e:
-    print(f"[ERROR] 模型加载失败: {e}")
+    print(f"[ERROR] 模型加载失败: {e}", flush=True)
     sys.exit(1)
 
 # ========== 关键：置信度阈值设置 ==========
 CONFIDENCE_THRESHOLD = 0.5  # 只显示置信度 >= 50% 的检测结果
 
 # 处理视频帧
-print("[DEBUG] 开始处理视频帧...")
+print("[DEBUG] 开始处理视频帧...", flush=True)
 frame_count = 0
 skip_frames = max(1, int(fps / 5))  # 每秒提取5帧
+
+# Emit expected processed-frame count so the C++ UI can track progress
+expected_processed_frames = max(1, total_frames // skip_frames)
+print(f"[DEBUG] 预计处理 {expected_processed_frames} 帧", flush=True)
 
 try:
     while True:
         ret, frame = cap.read()
         if not ret:
-            print(f"[DEBUG] 已读取所有帧，停止")
+            print(f"[DEBUG] 已读取所有帧，停止", flush=True)
             break
 
         # 每隔skip_frames帧处理一次
@@ -113,24 +117,24 @@ try:
             cv2.imwrite(detected_path, detected_frame)
 
             if original_frame_num % 10 == 0:
-                print(f"[DEBUG] 已处理 {original_frame_num} 帧")
+                print(f"[DEBUG] 已处理 {original_frame_num} 帧", flush=True)
 
         except Exception as e:
-            print(f"[ERROR] 处理第 {frame_count} 帧时出错: {e}")
+            print(f"[ERROR] 处理第 {frame_count} 帧时出错: {e}", flush=True)
             frame_count += 1
             continue
 
         frame_count += 1
 
     cap.release()
-    print(f"[SUCCESS] 视频处理完成，共处理 {frame_count} 帧")
+    print(f"[SUCCESS] 视频处理完成，共处理 {frame_count} 帧", flush=True)
 
     # 验证输出文件
     frame_files = [f for f in os.listdir(output_dir) if f.startswith("frame_")]
-    print(f"[DEBUG] 输出目录中的文件数: {len(frame_files)}")
+    print(f"[DEBUG] 输出目录中的文件数: {len(frame_files)}", flush=True)
 
 except Exception as e:
-    print(f"[ERROR] 处理过程中发生错误: {e}")
+    print(f"[ERROR] 处理过程中发生错误: {e}", flush=True)
     import traceback
     traceback.print_exc()
     sys.exit(1)

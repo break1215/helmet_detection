@@ -56,6 +56,7 @@ frame_count = 0
 detect_mode = False
 detect_interval = 2
 mode_check_interval = 10
+write_interval = 5  # Only write latest.jpg every N frames to reduce disk I/O
 # ========== 关键：置信度阈值设置 ==========
 CONFIDENCE_THRESHOLD = 0.8  # 只显示置信度 >= 80% 的检测结果
 
@@ -79,9 +80,10 @@ try:
             except:
                 pass
 
-        # 保存原始帧
-        original_path = os.path.join(output_dir, "latest.jpg")
-        cv2.imwrite(original_path, frame)
+        # Save original frame only every write_interval frames to reduce disk I/O
+        if frame_count % write_interval == 0:
+            original_path = os.path.join(output_dir, "latest.jpg")
+            cv2.imwrite(original_path, frame)
 
         # 检测模式处理
         if detect_mode and frame_count % detect_interval == 0:

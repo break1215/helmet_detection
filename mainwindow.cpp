@@ -10,6 +10,10 @@
 #include <QTimer>
 #include <QThread>
 #include <QProcess>
+#include <QFile>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QRegularExpression>
 
 MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent)
@@ -20,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
     , cameraTimer(nullptr)
     , currentVideoFrame(0)
     , totalVideoFrames(0)
+    , videoExpectedFrames(0)
     , cameraRunning(false)
 {
     // Get application directory
@@ -38,7 +43,27 @@ MainWindow::MainWindow(QWidget *parent)
     modelPath = resourceDir + "/models/best.pt";
     pythonDir = resourceDir + "/python";
     outputDir = appDir + "/output";
-    pythonExe = "D:\\develop\\anaconda\\envs\\yolov8\\python.exe";
+
+    // Determine Python executable: prefer hardcoded dev path if it exists,
+    // then a saved QSettings value, then fall back to PATH discovery.
+    {
+        const QString hardcodedPython = "D:\\develop\\anaconda\\envs\\yolov8\\python.exe";
+        QSettings settings("HelmetDetection", "YOLOv8Detector");
+        const QString savedPython = settings.value("pythonExe").toString();
+
+        if (QFile::exists(hardcodedPython)) {
+            pythonExe = hardcodedPython;
+        } else if (!savedPython.isEmpty() && QFile::exists(savedPython)) {
+            pythonExe = savedPython;
+        } else {
+            // Search system PATH for python3 then python
+            QString found = QStandardPaths::findExecutable("python3");
+            if (found.isEmpty()) {
+                found = QStandardPaths::findExecutable("python");
+            }
+            pythonExe = found.isEmpty() ? "python" : found;
+        }
+    }
 
     // Create output directory
     QDir dir;
@@ -418,9 +443,30 @@ void MainWindow::onBtnDetectVideo()
 
     disconnect(videoProcess, nullptr, nullptr, nullptr);
 
+    videoExpectedFrames = 0;
+    videoProgress->setValue(0);
+
+    // Regex patterns for parsing Python progress output (constructed once)
+    static const QRegularExpression reExpected(R"(\[DEBUG\] 预计处理 (\d+) 帧)");
+    static const QRegularExpression reProgress(R"(\[DEBUG\] 已处理 (\d+) 帧)");
+
     connect(videoProcess, &QProcess::readyReadStandardOutput, this, [this]() {
         QString output = QString::fromLocal8Bit(videoProcess->readAllStandardOutput());
         resultText->append(output);
+
+        // Parse expected processed-frame count reported by Python
+        QRegularExpressionMatch matchExpected = reExpected.match(output);
+        if (matchExpected.hasMatch()) {
+            videoExpectedFrames = matchExpected.captured(1).toInt();
+        }
+
+        // Parse processed-frame progress and update progress bar
+        QRegularExpressionMatch matchProgress = reProgress.match(output);
+        if (matchProgress.hasMatch() && videoExpectedFrames > 0) {
+            int processedFrames = matchProgress.captured(1).toInt();
+            int progress = (processedFrames * 100) / videoExpectedFrames;
+            videoProgress->setValue(qMin(progress, 99));
+        }
     });
 
     connect(videoProcess, &QProcess::readyReadStandardError, this, [this]() {

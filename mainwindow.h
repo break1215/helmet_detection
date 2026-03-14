@@ -93,6 +93,7 @@ private:
     // Video state
     int currentVideoFrame;
     int totalVideoFrames;
+    int videoExpectedFrames;
 
     // Camera state
     bool cameraRunning;  // 新增：摄像头状态标志
